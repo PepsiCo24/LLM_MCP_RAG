@@ -1,0 +1,21 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 虚拟环境
+.venv/
+
+# 长期记忆（用户隐私）
+chat_memory.json
+
+# 配置文件（含 API Key，不要提交）
+config.yaml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store

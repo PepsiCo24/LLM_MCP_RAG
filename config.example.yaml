@@ -1,0 +1,25 @@
+﻿# ============================================================
+# Augmented LLM 配置文件 (Chat + MCP + RAG)
+# ============================================================
+# 使用方法: 复制为 config.yaml 并填入你的 API Key
+
+# --- DeepSeek LLM 配置 ---
+llm:
+  api_key: "YOUR_DEEPSEEK_API_KEY"   # 替换为你的 API Key
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-chat"
+  max_tokens: 4096
+  temperature: 0.7
+
+# --- MCP Servers 配置 ---
+mcp_servers:
+  - name: "builtin"
+    command: ".venv/Scripts/python.exe"
+    args: ["mcp_servers/builtin_tools.py"]
+    env: {}
+
+# --- 系统参数 ---
+system:
+  max_tool_rounds: 10
+  log_level: "INFO"
+  memory_file: "chat_memory.json"
