@@ -5,7 +5,6 @@
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
 [![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-5364ff)](https://platform.deepseek.com/)
 [![MCP](https://img.shields.io/badge/Protocol-MCP-orange)](https://modelcontextprotocol.io/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
@@ -412,9 +411,3 @@ mcp_servers:
 ```
 
 所有 Server 的工具自动聚合，LLM 统一调用。
-
----
-
-## 📄 License
-
-MIT
