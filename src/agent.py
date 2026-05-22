@@ -1,7 +1,7 @@
 ﻿# ============================================================
 # src/agent.py - Agent ���ģ�Chat + MCP + RAG��
 # ============================================================
-import asyncio, json
+import asyncio, json, re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -278,13 +278,30 @@ class Agent:
         finally:
             self.llm._messages = saved
 
-        # Parse summaries
+        # Parse summaries (handle both @user: bio and @user\n\nbio formats)
         summaries = {}
-        for line in text.strip().split("\n"):
-            line = line.strip()
-            if line.startswith("@") and ":" in line:
-                username, bio = line.split(":", 1)
-                summaries[username.strip()] = bio.strip()
+        blocks = re.split(r'\n(?=@)', text.strip())
+        for block in blocks:
+            block = block.strip()
+            if not block.startswith("@"):
+                continue
+            first_nl = block.find("\n")
+            if first_nl == -1:
+                if ":" in block:
+                    username, bio = block.split(":", 1)
+                else:
+                    username, bio = block, ""
+            else:
+                header = block[:first_nl].strip()
+                body = block[first_nl:].strip()
+                if ":" in header:
+                    parts = header.split(":", 1)
+                    username = parts[0].strip()
+                    bio = (parts[1].strip() + " " + body).strip()
+                else:
+                    username = header
+                    bio = body
+            summaries[username] = bio
 
         # Aggregate MD
         agg = f"# RAG Results\n\n> Query: {query}\n> Time: {ts}\n> Source: {self._rag_data_url}\n\n---\n\n"
