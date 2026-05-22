@@ -19,3 +19,5 @@ config.yaml
 # OS
 Thumbs.db
 .DS_Store
+# 网页摘要输出
+abstract/

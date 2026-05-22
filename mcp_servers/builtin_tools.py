@@ -3,7 +3,7 @@
 # ============================================================
 """内置 MCP Server，提供文件操作和网页抓取工具。
 
-运行方式: .\.venv\Scripts\python.exe mcp_servers/builtin_tools.py
+运行方式: .venv/Scripts/python mcp_servers/builtin_tools.py
 依赖: pip install mcp httpx
 """
 
@@ -93,7 +93,7 @@ def _html_to_text(html: str) -> str:
 
 @server.tool()
 async def web_fetch_summary(url: str, max_length: int = 2000) -> str:
-    """抓取网页内容并生成纯文本摘要。
+    """抓取网页内容，生成摘要并自动保存为 Markdown 文件到 abstract/ 目录。
 
     Args:
         url: 网页 URL
@@ -109,9 +109,45 @@ async def web_fetch_summary(url: str, max_length: int = 2000) -> str:
     except Exception as e:
         return f"错误: 网页抓取失败 — {e}"
 
+    # 提取标题
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+    page_title = title_match.group(1).strip() if title_match else None
+
+    # HTML → 纯文本
     text = _html_to_text(html)
     summary = text[:max_length]
-    return f"来源: {url}\n原始长度: {len(text)} 字符\n内容摘要:\n\n{summary}"
+
+    # ── 保存到 abstract/ ──
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 文件名：优先用标题，否则用域名
+    if page_title:
+        safe_title = re.sub(r"[\\/:*?\"<>|]", "_", page_title)[:60]
+        filename = f"{safe_title}.md"
+    else:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc.replace(":", "_").replace(".", "_")
+        filename = f"{domain}.md"
+
+    out_dir = Path("abstract")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    filepath = out_dir / filename
+
+    md_content = f"""# {page_title or url}
+
+> 来源: [{url}]({url})
+> 抓取时间: {timestamp}
+> 原始长度: {len(text)} 字符
+
+---
+
+{summary}
+"""
+    filepath.write_text(md_content, encoding="utf-8")
+    save_msg = f"已保存到: {filepath}"
+
+    return f"来源: {url}\n标题: {page_title or "(无)"}\n原始长度: {len(text)} 字符\n{save_msg}\n\n内容摘要:\n\n{summary}"
 
 
 # ── 启动 ─────────────────────────────────────────────────
