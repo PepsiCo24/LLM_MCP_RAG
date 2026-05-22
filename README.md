@@ -86,7 +86,7 @@ graph TB
 
 ## ✨ 核心特性
 
-- **零框架依赖** — 不依赖 LangChain、LlamaIndex，只用 `openai` / `mcp` / `pyyaml` / `httpx` 四个轻量库
+- **零框架依赖** — 不依赖 LangChain、LlamaIndex，只用 4 个轻量库：`openai`(兼容DeepSeek API) / `mcp` / `pyyaml` / `httpx`
 - **多 MCP Server** — 支持同时连接多个 MCP Server，自动聚合工具列表
 - **Tool-Use 循环** — LLM 自主决定调用工具 → 执行 → 结果注入 → 继续推理
 - **日志横幅学习系统** — 每一步都有 `=== CHAT ===` / `=== TOOL USE ===` 等彩色横幅
