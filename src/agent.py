@@ -245,8 +245,9 @@ class Agent:
     # RAG 内部
     # ================================================================
 
+
     async def _augment_prompt(self, prompt: str) -> str:
-        """RAG 检索 + 拼接上下文 + 保存结果到 RAG_Result/。"""
+        """RAG 检索 -> 调 LLM 生成摘要 -> 保存 RAG_Result/ -> 拼接上下文。"""
         if not self._retriever or self._retriever.vector_store.size == 0:
             return prompt
 
@@ -263,21 +264,22 @@ class Agent:
             return prompt
 
         log_info(f"RAG: 检索到 {len(results)} 条 (top score={results[0]['score']})")
+        log_info("RAG: 正在调 LLM 为 top_k 条数据生成个性化摘要...")
 
-        # 保存结果到 RAG_Result/
-        self._save_rag_results(prompt, results)
+        # 异步生成摘要（不阻塞主流程）
+        asyncio.create_task(self._generate_and_save_summaries(prompt, results))
 
         # 拼接上下文
-        context_parts = ["## 🔍 检索到的相关信息\n"]
+        context_parts = ["## 检索到的相关信息\n"]
         for i, r in enumerate(results):
             try:
                 user = json.loads(r["document"])
                 context_parts.append(
-                    f"### 用户 {i+1}: {user.get('name', '?')} "
-                    f"(@{user.get('username', '?')}) — 相似度 {r['score']}\n"
-                    f"- 邮箱: {user.get('email', '?')}\n"
-                    f"- 公司: {user.get('company', {}).get('name', '?')}\n"
-                    f"- 地址: {user.get('address', {}).get('city', '?')}\n"
+                    f"### 用户 {i+1}: {user.get('name')} "
+                    f"(@{user.get('username')}) - 相似度 {r['score']}\n"
+                    f"- 邮箱: {user.get('email')}\n"
+                    f"- 公司: {user.get('company', {}).get('name')}\n"
+                    f"- 地址: {user.get('address', {}).get('city')}\n"
                 )
             except (json.JSONDecodeError, KeyError):
                 context_parts.append(f"### 条目 {i+1} (相似度 {r['score']})\n{r['document'][:200]}\n")
@@ -287,57 +289,90 @@ class Agent:
         log_info(f"RAG 上下文已注入: {len(context)} 字符")
         return augmented
 
-    def _save_rag_results(self, query: str, results: list[dict]) -> None:
-        """将 RAG 检索结果保存为 Markdown 到 RAG_Result/。"""
+    async def _generate_and_save_summaries(self, query: str, results: list[dict]) -> None:
+        """调 LLM 为每条检索结果生成个性化摘要，保存到 RAG_Result/。"""
+        if not self.llm or not self._retriever:
+            return
+
         out_dir = Path("RAG_Result")
         out_dir.mkdir(exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # 用时间戳做文件名，避免覆盖
         ts_file = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filepath = out_dir / f"rag_{ts_file}.md"
 
-        md = f"# RAG 检索结果\n\n"
-        md += f"> 查询: {query}\n> 时间: {timestamp}\n> 数据源: {self._rag_data_url}\n\n---\n\n"
-
+        users_text = ""
         for i, r in enumerate(results):
-            md += f"## 结果 {i+1} — 相似度 {r['score']}\n\n"
             try:
-                user = json.loads(r["document"])
-                md += f"- **姓名**: {user.get('name', '?')}\n"
-                md += f"- **用户名**: @{user.get('username', '?')}\n"
-                md += f"- **邮箱**: {user.get('email', '?')}\n"
-                md += f"- **电话**: {user.get('phone', '?')}\n"
-                md += f"- **网站**: {user.get('website', '?')}\n"
-                md += f"- **公司**: {user.get('company', {}).get('name', '?')}\n"
-                address = user.get('address', {})
-                md += f"- **地址**: {address.get('city', '?')}, {address.get('street', '?')}\n"
-            except (json.JSONDecodeError, KeyError):
-                md += f"```\n{r['document'][:500]}\n```\n"
-            md += "\n---\n\n"
-
-        # 同时保存每个结果的单独 MD
-        for i, r in enumerate(results):
-            name = "unknown"
-            try:
-                user = json.loads(r["document"])
-                name = user.get("username") or user.get("name", f"item_{i}")
+                u = json.loads(r["document"])
+                users_text += f"### {i+1}. {u.get('name')} (@{u.get('username')}) [score={r['score']}]\n"
+                c = u.get("company", {})
+                a = u.get("address", {})
+                users_text += f"company: {c.get('name')} | {c.get('catchPhrase')}\n"
+                users_text += f"address: {a.get('city')}, {a.get('street')}\n"
+                users_text += f"email: {u.get('email')} | phone: {u.get('phone')}\n\n"
             except Exception:
-                name = f"item_{i}"
-            safe = str(name).replace("/", "_").replace("\\", "_")[:40]
-            single_path = out_dir / f"{safe}.md"
+                users_text += f"### {i+1}. [score={r['score']}]\n{r['document'][:300]}\n\n"
 
-            smd = f"# {user.get('name', name) if 'user' in dir() else name}\n\n"
-            smd += f"> 查询: {query}\n> 相似度: {r['score']}\n> 时间: {timestamp}\n\n"
-            smd += "```json\n" + r['document'][:2000] + "\n```\n"
-            single_path.write_text(smd, encoding="utf-8")
+        summary_prompt = (
+            f"请为以下 {len(results)} 个人的数据各写一句80字以内的简体中文简介,"
+            f"突出职业/公司/城市。必须每人一句，不可省略。"
+            f"格式: @用户名: 简介\n\n{users_text}"
+        )
 
-        filepath.write_text(md, encoding="utf-8")
-        log_info(f"RAG 结果已保存: RAG_Result/ ({len(results)} 条)")
+        saved_messages = self.llm._messages.copy()
+        try:
+            raw = await self.llm.chat(summary_prompt, tools=None)
+            summary_text = raw.get("content", "")
+        except Exception as e:
+            log_warn(f"RAG summary generation failed: {e}")
+            return
+        finally:
+            self.llm._messages = saved_messages
 
-    # ================================================================
-    # 内部
-    # ================================================================
+        summaries = {}
+        for line in summary_text.strip().split("\n"):
+            line = line.strip()
+            if line.startswith("@") and ":" in line:
+                username, bio = line.split(":", 1)
+                summaries[username.strip()] = bio.strip()
+
+        # Aggregate MD
+        summary_md = f"# RAG Results\n\n"
+        summary_md += f"> Query: {query}\n> Time: {timestamp}\n> Source: {self._rag_data_url}\n\n---\n\n"
+
+        for i, r in enumerate(results):
+            try:
+                u = json.loads(r["document"])
+                username = u.get("username", "?")
+                bio = summaries.get(f"@{username}", "(not generated)")
+            except Exception:
+                username = f"item_{i}"
+                u = {}
+                bio = "(parse error)"
+            summary_md += f"## {u.get('name', username)} (@{username}) - Score {r['score']}\n\n"
+            summary_md += f"**Bio**: {bio}\n\n"
+            summary_md += f"- Email: {u.get('email', '?')}\n"
+            summary_md += f"- Company: {u.get('company', {}).get('name', '?')}\n"
+            summary_md += f"- City: {u.get('address', {}).get('city', '?')}\n\n---\n\n"
+
+        (out_dir / f"rag_{ts_file}.md").write_text(summary_md, encoding="utf-8")
+
+        # Individual user MDs
+        for i, r in enumerate(results):
+            try:
+                u = json.loads(r["document"])
+                username = u.get("username", f"item_{i}")
+                bio = summaries.get(f"@{username}", "(not generated)")
+                smd = f"# {u.get('name', username)}\n\n"
+                smd += f"> Query: {query}\n> Score: {r['score']}\n> Time: {timestamp}\n\n"
+                smd += f"**Bio**: {bio}\n\n"
+                smd += f"- Email: {u.get('email', '?')}\n"
+                smd += f"- Company: {u.get('company', {}).get('name', '?')}\n"
+                smd += f"- City: {u.get('address', {}).get('city', '?')}\n"
+                (out_dir / f"{username}.md").write_text(smd, encoding="utf-8")
+            except Exception:
+                pass
+
+        log_info(f"RAG summaries saved: RAG_Result/ ({len(results)} items)")
 
     def _resolve_memory_path(self) -> Path:
         return Path(self._config.system.memory_file).resolve()
