@@ -28,6 +28,14 @@ class MCPServerConfig:
 
 
 @dataclass
+class EmbeddingConfig:
+    api_key: str = ""
+    base_url: str = "https://api.siliconflow.cn/v1"
+    model: str = "BAAI/bge-m3"
+    data_url: str = ""
+
+
+@dataclass
 class SystemConfig:
     max_tool_rounds: int = 10
     log_level: str = "INFO"
@@ -38,6 +46,7 @@ class SystemConfig:
 class AppConfig:
     llm: LLMConfig
     mcp_servers: list[MCPServerConfig]
+    embedding: EmbeddingConfig
     system: SystemConfig
 
 
@@ -61,6 +70,8 @@ def load_config(path: str | Path = "config.yaml") -> AppConfig:
             env=s.get("env", {}),
         ))
 
+    embedding = EmbeddingConfig(**raw.get("embedding", {}))
+
     system = SystemConfig(**raw.get("system", {}))
 
-    return AppConfig(llm=llm, mcp_servers=servers, system=system)
+    return AppConfig(llm=llm, mcp_servers=servers, embedding=embedding, system=system)
