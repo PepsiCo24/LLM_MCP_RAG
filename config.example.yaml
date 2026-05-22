@@ -37,6 +37,7 @@ embedding:
   base_url: "https://api.siliconflow.cn/v1"
   model: "BAAI/bge-m3"
   data_url: ""                          # 数据源 URL（JSON 数组），留空则不构建索引
+  top_k: 3            # RAG 检索返回的最大条数
 
 # --- 系统参数 ---
 system:

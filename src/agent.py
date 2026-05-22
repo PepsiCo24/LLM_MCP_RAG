@@ -250,7 +250,7 @@ class Agent:
 
         banner_rag()
         try:
-            results = self._retriever.retrieve(prompt, top_k=3)
+            results = self._retriever.retrieve(prompt, top_k=self._config.embedding.top_k)
         except Exception as e:
             log_warn(f"RAG 检索失败: {e}")
             return prompt

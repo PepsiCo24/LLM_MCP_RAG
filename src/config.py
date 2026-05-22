@@ -33,6 +33,7 @@ class EmbeddingConfig:
     base_url: str = "https://api.siliconflow.cn/v1"
     model: str = "BAAI/bge-m3"
     data_url: str = ""
+    top_k: int = 3
 
 
 @dataclass
