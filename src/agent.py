@@ -198,18 +198,30 @@ class Agent:
             log_info("RAG: no results")
             return prompt
 
-        # --- Print all top_k results to terminal ---
-        print(f"\n  RAG: top_{top_k} results ({len(results)} found):")
+        # --- Print all top_k detail to terminal ---
+        sep = "=" * 50
+        print(f"\n  {sep}")
+        print(f"  RAG: top_{top_k} results ({len(results)} found):")
         for i, r in enumerate(results):
             try:
                 u = json.loads(r["document"])
-                print(f"  #{i+1} {u.get('name','?')} (@{u.get('username','?')}) score={r['score']:.4f}")
-                print(f"     {u.get('email','?')} | {u.get('company',{}).get('name','?')} | {u.get('address',{}).get('city','?')}")
+                c = u.get("company", {})
+                a = u.get("address", {})
+                print(f"  --- #{i+1} score={r['score']:.4f} ---")
+                print(f"  Name:    {u.get('name','?')}  (@{u.get('username','?')})")
+                print(f"  Email:   {u.get('email','?')}")
+                print(f"  Phone:   {u.get('phone','?')}")
+                print(f"  Website: {u.get('website','?')}")
+                print(f"  Company: {c.get('name','?')}")
+                print(f"           {c.get('catchPhrase','?')}")
+                print(f"  Address: {a.get('city','?')}, {a.get('street','?')}, {a.get('suite','?')}")
+                print(f"           {a.get('zipcode','?')}")
             except Exception:
-                print(f"  #{i+1} score={r['score']:.4f} | {r['document'][:80]}")
-        print()
+                print(f"  --- #{i+1} score={r['score']:.4f} ---")
+                print(f"  {r['document'][:120]}")
+        print(f"  {sep}\n")
 
-        # --- Async: call LLM to generate summaries, save to RAG_Result/ ---
+# --- Async: call LLM to generate summaries, save to RAG_Result/ ---
         asyncio.create_task(self._generate_summaries(prompt, results))
 
         # --- Build augmented prompt ---
@@ -249,9 +261,11 @@ class Agent:
                 users_text += f"### {i+1}. [score={r['score']:.4f}]\n{r['document'][:300]}\n\n"
 
         summary_prompt = (
-            f"为以下 {len(results)} 个人的数据各写一句80字以内的简体中文简介,"
-            f"突出职业/公司/城市。必须每人一句，不可省略。"
-            f"格式: @用户名: 简介\n\n{users_text}"
+            f"你是一位人物传记作家。请根据以下 {len(results)} 个人的数据，"
+            f"为每人撰写一段 150-200 字的个性化简介（简体中文），要有故事感。"
+            f"包含：姓名、职业身份（结合company和catchPhrase）、所在城市、"
+            f"以及根据其信息合理想象的生活细节或工作场景。"
+            f"输出格式：每段以 @用户名 开头，空行分隔。\n\n{users_text}"
         )
 
         saved = self.llm._messages.copy()
