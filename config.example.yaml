@@ -18,8 +18,28 @@ mcp_servers:
     args: ["mcp_servers/builtin_tools.py"]
     env: {}
 
+  # 示例: 文件系统 MCP Server (使用 npx, 需安装 Node.js)
+  # - name: "filesystem"
+  #   command: "npx"
+  #   args: ["-y", "@modelcontextprotocol/server-filesystem", "E:/Agent_rec/Agent_LLM_MCP_RAG/data"]
+  #   env: {}
+
+  # 示例: 网页抓取 MCP Server (使用 uvx, 需安装 uv)
+  # - name: "fetch"
+  #   command: "uvx"
+  #   args: ["mcp-server-fetch"]
+  #   env: {}
+
+# --- Embedding / RAG 配置 ---
+# 留空 api_key 即禁用 RAG；填入 SiliconFlow Key 即可启用
+embedding:
+  api_key: "YOUR_SILICONFLOW_API_KEY"   # 替换为你的 SiliconFlow API Key
+  base_url: "https://api.siliconflow.cn/v1"
+  model: "BAAI/bge-m3"
+  data_url: ""                          # 数据源 URL（JSON 数组），留空则不构建索引
+
 # --- 系统参数 ---
 system:
-  max_tool_rounds: 10
-  log_level: "INFO"
-  memory_file: "chat_memory.json"
+  max_tool_rounds: 10     # 最大工具调用轮数（防止死循环）
+  log_level: "INFO"       # DEBUG | INFO | WARNING
+  memory_file: "chat_memory.json"  # 长期记忆文件（关闭终端后保留）
