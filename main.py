@@ -29,7 +29,7 @@ async def run_terminal(agent: Agent) -> None:
     print("  命令:")
     print("    输入消息        → 发送给 LLM")
     print("    /tools          → 查看可用工具")
-    print("    /clear          → 清空对话历史 + 记忆")
+    print("    /clear          → 清空对话历史 + 记忆 + RAG 数据")
     print("    /RAG <url>      → 加载数据源 URL（重建向量索引）")
     print("    exit / quit     → 退出")
     print("=" * 60 + "\n")
@@ -50,7 +50,7 @@ async def run_terminal(agent: Agent) -> None:
             continue
         if user_input == "/clear":
             agent.reset_conversation()
-            log_info("对话历史已清空，记忆文件已删除")
+            log_info("已清空：对话历史 + 记忆 + DATA/ + RAG_Result/")
             continue
         if user_input.startswith("/RAG "):
             url = user_input[len("/RAG "):].strip()

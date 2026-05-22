@@ -1,7 +1,7 @@
 ﻿# ============================================================
-# src/agent.py - Agent ���ģ�Chat + MCP + RAG��
+# src/agent.py - Agent 核心（Chat + MCP + RAG）
 # ============================================================
-import asyncio, json, re
+import asyncio, json, re, shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,17 +24,17 @@ from .logger import (
 
 class Agent:
     DEFAULT_SYSTEM_PROMPT = (
-        "����Ե��ù�����������񣬰�����д�ļ�����Ŀ¼��ץȡ��ҳ�ȡ�"
-        "����Ҫʹ�ù���ʱ�����ϸ� function calling ��ʽ���ء�"
-        "ʹ�����Ļش��û����⡣"
+        "你可以调用工具来完成任务，包括读写文件、列目录、抓取网页等。"
+        "当需要使用工具时，请严格按 function calling 格式返回。"
+        "用中文礼貌地回答用户的问题。"
     )
     _MODEL_IDENTITY = {
-        "deepseek-chat": "���� DeepSeek�������������˾����� AI �������֡�",
-        "deepseek-reasoner": "���� DeepSeek-R1�������������˾���������ģ�͡�",
-        "gpt-4o": "���� GPT-4o���� OpenAI ������ AI ���֡�",
-        "gpt-4": "���� GPT-4���� OpenAI ������ AI ���֡�",
-        "claude": "���� Claude���� Anthropic ������ AI ���֡�",
-        "qwen": "���� Qwen��ͨ��ǧ�ʣ����ɰ����ƿ����� AI ���֡�",
+        "deepseek-chat": "我是 DeepSeek，由深度求索公司开发的 AI 智能助手。",
+        "deepseek-reasoner": "我是 DeepSeek-R1，由深度求索公司开发的推理模型。",
+        "gpt-4o": "我是 GPT-4o，由 OpenAI 开发的 AI 助手。",
+        "gpt-4": "我是 GPT-4，由 OpenAI 开发的 AI 助手。",
+        "claude": "我是 Claude，由 Anthropic 开发的 AI 助手。",
+        "qwen": "我是 Qwen（通义千问），由阿里云开发的 AI 助手。",
     }
 
     def __init__(self, config: AppConfig):
@@ -172,13 +172,23 @@ class Agent:
         return [{"name": t["name"], "description": t.get("description", ""), "server": t.get("server_name", "?")}
                 for t in self._mcp_manager.tools]
 
-    def reset_conversation(self):
+    def reset_conversation(self, clear_rag: bool = True):
         if self.llm:
             self.llm.reset_conversation()
             try:
                 self._resolve_memory_path().unlink(missing_ok=True)
             except Exception:
                 pass
+        if clear_rag:
+            for d in (Path("DATA"), Path("RAG_Result")):
+                try:
+                    if d.exists():
+                        shutil.rmtree(d)
+                except Exception:
+                    pass
+            if self._retriever:
+                self._retriever.vector_store.clear()
+                self._rag_data_url = ""
 
     # ================================================================
     # RAG internals
@@ -261,11 +271,12 @@ class Agent:
                 users_text += f"### {i+1}. [score={r['score']:.4f}]\n{r['document'][:300]}\n\n"
 
         summary_prompt = (
-            f"����һλ���ﴫ�����ҡ���������� {len(results)} ���˵����ݣ�"
-            f"Ϊÿ��׫дһ�� 150-200 �ֵĸ��Ի���飨�������ģ���Ҫ�й��¸С�"
-            f"������������ְҵ��ݣ����company��catchPhrase�������ڳ��С�"
-            f"�Լ���������Ϣ�������������ϸ�ڻ���������"
-            f"�����ʽ��ÿ���� @�û��� ��ͷ�����зָ��\n\n{users_text}"
+            f"你是一位人物传记作家。请根据以下 {len(results)} 个人的数据，"
+            f"为每人撰写一段 150-200 字的个性化简介（简体中文），要有故事感。"
+            f"包含：姓名、职业身份（结合company和catchPhrase）、所在城市、"
+            f"以及根据其信息合理想象的生活细节或工作场景。"
+            f"输出格式严格如下：每段第一行必须是 @用户名（只用username字段的值，例如 @Bret，不要加姓名），"
+            f"然后空一行，再写简介正文。各段之间用空行分隔。\n\n{users_text}"
         )
 
         saved = self.llm._messages.copy()
@@ -309,12 +320,12 @@ class Agent:
             try:
                 u = json.loads(r["document"])
                 username = u.get("username", "?")
-                bio = summaries.get(f"@{username}", "(not generated)")
+                bio = (summaries.get(f"@{username}") or next((v for k,v in summaries.items() if username in k), "(not generated)"))
             except Exception:
                 username = f"item_{i}"
                 u = {}
                 bio = "(parse error)"
-            agg += f"## {u.get('name', username)} (@{username}) �� Score {r['score']:.4f}\n\n"
+            agg += f"## {u.get('name', username)} (@{username}) | Score {r['score']:.4f}\n\n"
             agg += f"**Abstract**: {bio}\n\n"
             agg += "```json\n" + json.dumps(u, ensure_ascii=False, indent=2)[:1500] + "\n```\n\n---\n\n"
         (out_dir / f"rag_{ts_file}.md").write_text(agg, encoding="utf-8")
@@ -324,7 +335,7 @@ class Agent:
             try:
                 u = json.loads(r["document"])
                 username = u.get("username", f"item_{i}")
-                bio = summaries.get(f"@{username}", "(not generated)")
+                bio = (summaries.get(f"@{username}") or next((v for k,v in summaries.items() if username in k), "(not generated)"))
                 smd = f"# {u.get('name', username)}\n\n"
                 smd += f"> Query: {query}\n> Score: {r['score']:.4f}\n> Time: {ts}\n> Source: {self._rag_data_url}\n\n"
                 smd += f"## Abstract\n\n{bio}\n\n"
@@ -343,5 +354,5 @@ class Agent:
         return Path(self._config.system.memory_file).resolve()
 
     def _build_system_prompt(self) -> str:
-        identity = self._MODEL_IDENTITY.get(self.model, f"���� {self.model} AI �������֡�")
+        identity = self._MODEL_IDENTITY.get(self.model, f"我是 {self.model} AI 智能助手。")
         return f"{identity}\n\n{self.system_prompt}"
