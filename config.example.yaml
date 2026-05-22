@@ -36,7 +36,7 @@ embedding:
   api_key: "YOUR_SILICONFLOW_API_KEY"   # 替换为你的 SiliconFlow API Key
   base_url: "https://api.siliconflow.cn/v1"
   model: "BAAI/bge-m3"
-  data_url: ""                          # 数据源 URL（JSON 数组），留空则不构建索引
+  data_url: ""                          # 数据源 URL（JSON 数组），用 /RAG <url> 动态加载
   top_k: 3            # RAG 检索返回的最大条数
 
 # --- 系统参数 ---

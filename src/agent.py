@@ -79,9 +79,6 @@ class Agent:
         await self._mcp_manager.connect_all()
         self._mcp_clients = list(self._mcp_manager.clients)
 
-        # RAG: 从 config 加载数据源
-        if self._config.embedding.data_url:
-            await self.reload_rag(self._config.embedding.data_url)
 
         # 长期记忆
         memory_path = self._resolve_memory_path()
