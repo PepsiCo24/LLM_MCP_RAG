@@ -21,3 +21,7 @@ Thumbs.db
 .DS_Store
 # 网页摘要输出
 abstract/
+
+# RAG 数据与结果
+DATA/
+RAG_Result/
