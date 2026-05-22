@@ -1,5 +1,5 @@
 ﻿# ============================================================
-# src/agent.py - Agent 核心（Chat + MCP + RAG）
+# src/agent.py - Agent ���ģ�Chat + MCP + RAG��
 # ============================================================
 import asyncio, json
 from datetime import datetime
@@ -24,17 +24,17 @@ from .logger import (
 
 class Agent:
     DEFAULT_SYSTEM_PROMPT = (
-        "你可以调用工具来完成任务，包括读写文件、列目录、抓取网页等。"
-        "当需要使用工具时，请严格按 function calling 格式返回。"
-        "使用中文回答用户问题。"
+        "����Ե��ù�����������񣬰�����д�ļ�����Ŀ¼��ץȡ��ҳ�ȡ�"
+        "����Ҫʹ�ù���ʱ�����ϸ� function calling ��ʽ���ء�"
+        "ʹ�����Ļش��û����⡣"
     )
     _MODEL_IDENTITY = {
-        "deepseek-chat": "你是 DeepSeek，由深度求索公司创造的 AI 智能助手。",
-        "deepseek-reasoner": "你是 DeepSeek-R1，由深度求索公司创造的推理模型。",
-        "gpt-4o": "你是 GPT-4o，由 OpenAI 开发的 AI 助手。",
-        "gpt-4": "你是 GPT-4，由 OpenAI 开发的 AI 助手。",
-        "claude": "你是 Claude，由 Anthropic 开发的 AI 助手。",
-        "qwen": "你是 Qwen（通义千问），由阿里云开发的 AI 助手。",
+        "deepseek-chat": "���� DeepSeek�������������˾����� AI �������֡�",
+        "deepseek-reasoner": "���� DeepSeek-R1�������������˾���������ģ�͡�",
+        "gpt-4o": "���� GPT-4o���� OpenAI ������ AI ���֡�",
+        "gpt-4": "���� GPT-4���� OpenAI ������ AI ���֡�",
+        "claude": "���� Claude���� Anthropic ������ AI ���֡�",
+        "qwen": "���� Qwen��ͨ��ǧ�ʣ����ɰ����ƿ����� AI ���֡�",
     }
 
     def __init__(self, config: AppConfig):
@@ -222,7 +222,7 @@ class Agent:
         print(f"  {sep}\n")
 
 # --- Async: call LLM to generate summaries, save to RAG_Result/ ---
-        asyncio.create_task(self._generate_summaries(prompt, results))
+        await self._generate_summaries(prompt, results)
 
         # --- Build augmented prompt ---
         ctx = ["## RAG context (top_k={})".format(len(results))]
@@ -261,11 +261,11 @@ class Agent:
                 users_text += f"### {i+1}. [score={r['score']:.4f}]\n{r['document'][:300]}\n\n"
 
         summary_prompt = (
-            f"你是一位人物传记作家。请根据以下 {len(results)} 个人的数据，"
-            f"为每人撰写一段 150-200 字的个性化简介（简体中文），要有故事感。"
-            f"包含：姓名、职业身份（结合company和catchPhrase）、所在城市、"
-            f"以及根据其信息合理想象的生活细节或工作场景。"
-            f"输出格式：每段以 @用户名 开头，空行分隔。\n\n{users_text}"
+            f"����һλ���ﴫ�����ҡ���������� {len(results)} ���˵����ݣ�"
+            f"Ϊÿ��׫дһ�� 150-200 �ֵĸ��Ի���飨�������ģ���Ҫ�й��¸С�"
+            f"������������ְҵ��ݣ����company��catchPhrase�������ڳ��С�"
+            f"�Լ���������Ϣ�������������ϸ�ڻ���������"
+            f"�����ʽ��ÿ���� @�û��� ��ͷ�����зָ��\n\n{users_text}"
         )
 
         saved = self.llm._messages.copy()
@@ -297,7 +297,7 @@ class Agent:
                 username = f"item_{i}"
                 u = {}
                 bio = "(parse error)"
-            agg += f"## {u.get('name', username)} (@{username}) — Score {r['score']:.4f}\n\n"
+            agg += f"## {u.get('name', username)} (@{username}) �� Score {r['score']:.4f}\n\n"
             agg += f"**Abstract**: {bio}\n\n"
             agg += "```json\n" + json.dumps(u, ensure_ascii=False, indent=2)[:1500] + "\n```\n\n---\n\n"
         (out_dir / f"rag_{ts_file}.md").write_text(agg, encoding="utf-8")
@@ -326,5 +326,5 @@ class Agent:
         return Path(self._config.system.memory_file).resolve()
 
     def _build_system_prompt(self) -> str:
-        identity = self._MODEL_IDENTITY.get(self.model, f"你是 {self.model} AI 智能助手。")
+        identity = self._MODEL_IDENTITY.get(self.model, f"���� {self.model} AI �������֡�")
         return f"{identity}\n\n{self.system_prompt}"
