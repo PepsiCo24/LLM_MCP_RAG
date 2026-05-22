@@ -317,6 +317,59 @@ sequenceDiagram
     A->>U: 🤖 助手: 项目目录下有 src/、main.py...
 ```
 
+### 工具匹配机制 — 谁决定用哪个工具？
+
+**答案是：DeepSeek 模型内部自己决定，我们的代码完全不做匹配。**
+
+```text
+👤 "列出当前项目目录下的文件"  ← 用户自然语言，原样发送
+         │
+         ▼
+┌──────────────────────────────────────────────────┐
+│  POST https://api.deepseek.com                   │
+│  {                                               │
+│    "messages": [                                 │
+│      {"role": "user",                            │
+│       "content": "列出当前项目目录下的文件"}      │ ← 原样
+│    ],                                            │
+│    "tools": [                                    │
+│      { "function": {                             │
+│          "name": "list_directory",               │
+│          "description": "列出目录中的文件。",     │ ← DeepSeek
+│          "parameters": { "path": "string" }      │   用这些
+│      }},                                         │   做匹配
+│      { "function": { "name": "read_file", ... }},│
+│      { "function": { "name": "web_fetch", ... }} │
+│    ],                                            │
+│    "tool_choice": "auto"                         │ ← 由模型判断
+│  }                                               │
+└──────────────────────────────────────────────────┘
+         │
+         │  DeepSeek 内部推理：
+         │  "列出目录" → 语义匹配 list_directory
+         │  "当前项目" → 自动填充 path="."
+         ▼
+┌──────────────────────────────────────────────────┐
+│  RESPONSE:                                       │
+│  {                                               │
+│    "tool_calls": [{                              │
+│      "function": {                               │
+│        "name": "list_directory",  ← LLM 选的工具  │
+│        "arguments": "{\"path\":\".\"}"← 自动提取  │
+│      }                                           │
+│    }]                                            │
+│  }                                               │
+└──────────────────────────────────────────────────┘
+         │
+         │  我们的代码只做 3 件事：
+         │  ① 把工具定义传给 LLM（get_tools_for_llm）
+         │  ② 解析 LLM 返回的 tool_calls 去执行（ToolExecutor）
+         │  ③ 把执行结果注入回对话（add_tool_result）
+         ▼
+```
+
+**关键点**：`tool_choice: "auto"` 告诉模型"你自己判断要不要用工具"。模型通过对比用户意图与每个工具的 `name`、`description`、`parameters` 做语义匹配并自动填充参数。无需任何 if-else 或正则。
+
 ### 核心循环伪代码
 
 ```python
