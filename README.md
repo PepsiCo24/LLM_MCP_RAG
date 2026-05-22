@@ -1,6 +1,6 @@
 ﻿# 🤖 Augmented LLM — Chat + MCP + RAG
 
-> **从零构建的增强型 LLM 应用** — 不依赖 LangChain、LlamaIndex 等框架，纯手写每一行代码，深入理解 LLM Agent 的底层工作原理。
+> **从零构建的增强型 LLM 应用** — 不依赖 LangChain、LlamaIndex 等框架写每一行代码，深入理解 LLM Agent 的底层工作原理。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
 [![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-5364ff)](https://platform.deepseek.com/)
